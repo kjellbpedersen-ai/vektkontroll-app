@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5, user-scalable=yes">
+    <meta name="description" content="Profesjonell vektkontrrollapp med mat-registrering, kaloriberegning og vektkontroll. Inspirert av VG Vektklubb.">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Vektkontroll">
+    <meta name="apple-mobile-web-app-startup-image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1170 2532'><rect fill='%23ffffff' width='1170' height='2532'/><rect fill='%233b82f6' width='1170' height='200'/></svg>">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%233b82f6' width='100' height='100'/><text x='50' y='50' font-size='60' text-anchor='middle' dominant-baseline='middle'>💪</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180' rx='40'/><text x='90' y='90' font-size='100' text-anchor='middle' dominant-baseline='middle'>💪</text></svg>">
+
+    <title>Vektkontroll - Profesjonell Vektapp</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recharts@2.10.3/dist/recharts.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f9fafb;
+        }
+        body {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        #root {
+            min-height: 100vh;
+        }
+        @supports (padding: max(0px)) {
+            body {
+                padding-left: max(12px, env(safe-area-inset-left));
+                padding-right: max(12px, env(safe-area-inset-right));
+                padding-top: max(12px, env(safe-area-inset-top));
+            }
+        }
+        input {
+            font-size: 16px;
+        }
+        button {
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('Install prompt ready');
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+            }
+        });
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } = window.recharts;
+
+        function VektKontrollApp() {
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [password, setPassword] = useState('');
+            const [loginPassword, setLoginPassword] = useState('');
+            const [isFirstTime, setIsFirstTime] = useState(true);
+            const [passwordError, setPasswordError] = useState('');
+
+            const [foods, setFoods] = useState([]);
+            const [weights, setWeights] = useState([]);
+            const [favorites, setFavorites] = useState([]);
+            const [dailyCalorieGoal, setDailyCalorieGoal] = useState(2000);
+
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [selectedFood, setSelectedFood] = useState(null);
+            const [foodPortionSize, setFoodPortionSize] = useState(100);
+            const [searchLoading, setSearchLoading] = useState(false);
+
+            const [weightValue, setWeightValue] = useState('');
+            const [weightDate, setWeightDate] = useState(new Date().toISOString().split('T')[0]);
+
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [showFoodForm, setShowFoodForm] = useState(false);
+            const [showWeightForm, setShowWeightForm] = useState(false);
+            const [showSettings, setShowSettings] = useState(false);
+
+            useEffect(() => {
+                const savedData = localStorage.getItem('vektapp_data');
+                const passwordHash = localStorage.getItem('vektapp_password');
+
+                if (passwordHash) {
+                    setIsFirstTime(false);
+                }
+
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    setFoods(data.foods || []);
+                    setWeights(data.weights || []);
+                    setFavorites(data.favorites || []);
+                    setDailyCalorieGoal(data.dailyCalorieGoal || 2000);
+                }
+            }, []);
+
+            const hashPassword = (pwd) => {
+                let hash = 0;
+                for (let i = 0; i < pwd.length; i++) {
+                    const char = pwd.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return Math.abs(hash).toString(16);
+            };
+
+            const handleSetupPassword = (e) => {
+                e.preventDefault();
+                if (password.length < 4) {
+                    setPasswordError('Passordet må være minst 4 tegn');
+                    return;
+                }
+                localStorage.setItem('vektapp_password', hashPassword(password));
+                setIsFirstTime(false);
+                setPassword('');
+                setPasswordError('');
+                setIsLoggedIn(true);
+            };
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                const savedHash = localStorage.getItem('vektapp_password');
+                if (hashPassword(loginPassword) === savedHash) {
+                    setIsLoggedIn(true);
+                    setLoginPassword('');
+                    setPasswordError('');
+                } else {
+                    setPasswordError('Feil passord');
+                    setLoginPassword('');
+                }
+            };
+
+            const handleLogout = () => {
+                setIsLoggedIn(false);
+                setLoginPassword('');
+            };
+
+            const searchFood = async () => {
+                if (searchQuery.length < 2) {
+                    setPasswordError('Skriv minst 2 tegn');
+                    return;
+                }
+
+                setSearchLoading(true);
+                setPasswordError('');
+
+                try {
+                    const response = await fetch(
+                        `https://fdc.nal.usda.gov/api/foods/search?query=${encodeURIComponent(searchQuery)}&pageSize=10&api_key=DEMO_KEY`
+                    );
+
+                    if (!response.ok) throw new Error('API error');
+
+                    const data = await response.json();
+                    const formattedResults = data.foods.map(food => ({
+                        id: food.fdcId,
+                        description: food.description,
+                        calories: food.foodNutrients?.find(n => n.nutrientName === 'Energy')?.value || 0,
+                    }));
+
+                    setSearchResults(formattedResults);
+                } catch (error) {
+                    setPasswordError('Kunne ikke søke i database. Prøv igjen.');
+                }
+
+                setSearchLoading(false);
+            };
+
+            const addFood = () => {
+                if (!selectedFood) {
+                    setPasswordError('Velg en mat');
+                    return;
+                }
+
+                const caloriePer100g = selectedFood.calories / 100;
+                const totalCalories = Math.round(caloriePer100g * foodPortionSize);
+
+                const newFood = {
+                    id: Date.now(),
+                    name: selectedFood.description,
+                    calories: totalCalories,
+                    portion: foodPortionSize,
+                    date: new Date().toISOString().split('T')[0],
+                    timestamp: new Date(),
+                };
+
+                const updatedFoods = [...foods, newFood];
+                setFoods(updatedFoods);
+                saveData(updatedFoods, weights, favorites);
+
+                setSelectedFood(null);
+                setSearchQuery('');
+                setSearchResults([]);
+                setFoodPortionSize(100);
+                setShowFoodForm(false);
+                setPasswordError('');
+            };
+
+            const addToFavorites = (food) => {
+                const existingFav = favorites.find(f => f.id === food.id);
+                if (!existingFav) {
+                    const updatedFavs = [...favorites, food];
+                    setFavorites(updatedFavs);
+                    saveData(foods, weights, updatedFavs);
+                    setPasswordError('');
+                }
+            };
+
+            const useFavorite = (fav) => {
+                const newFood = {
+                    id: Date.now(),
+                    name: fav.description,
+                    calories: fav.calories,
+                    portion: 100,
+                    date: new Date().toISOString().split('T')[0],
+                    timestamp: new Date(),
+                };
+
+                const updatedFoods = [...foods, newFood];
+                setFoods(updatedFoods);
+                saveData(updatedFoods, weights, favorites);
+            };
+
+            const deleteFood = (id) => {
+                const updatedFoods = foods.filter(f => f.id !== id);
+                setFoods(updatedFoods);
+                saveData(updatedFoods, weights, favorites);
+            };
+
+            const addWeight = (e) => {
+                e.preventDefault();
+                if (!weightValue) {
+                    setPasswordError('Skriv inn vekt');
+                    return;
+                }
+
+                const newWeight = {
+                    id: Date.now(),
+                    weight: parseFloat(weightValue),
+                    date: weightDate,
+                    timestamp: new Date(weightDate),
+                };
+
+                const updatedWeights = [...weights, newWeight].sort((a, b) => new Date(a.date) - new Date(b.date));
+                setWeights(updatedWeights);
+                saveData(foods, updatedWeights, favorites);
+
+                setWeightValue('');
+                setWeightDate(new Date().toISOString().split('T')[0]);
+                setShowWeightForm(false);
+                setPasswordError('');
+            };
+
+            const deleteWeight = (id) => {
+                const updatedWeights = weights.filter(w => w.id !== id);
+                setWeights(updatedWeights);
+                saveData(foods, updatedWeights, favorites);
+            };
+
+            const saveData = (foodsData, weightsData, favoritesData) => {
+                const dataToSave = {
+                    foods: foodsData,
+                    weights: weightsData,
+                    favorites: favoritesData,
+                    dailyCalorieGoal: dailyCalorieGoal,
+                };
+                localStorage.setItem('vektapp_data', JSON.stringify(dataToSave));
+            };
+
+            const today = new Date().toISOString().split('T')[0];
+            const todaysFoods = foods.filter(f => f.date === today);
+            const todaysCalories = todaysFoods.reduce((sum, f) => sum + f.calories, 0);
+            const remainingCalories = dailyCalorieGoal - todaysCalories;
+            const caloriePercentage = Math.min(100, (todaysCalories / dailyCalorieGoal) * 100);
+
+            const lastWeight = weights.length > 0 ? weights[weights.length - 1].weight : null;
+            const firstWeight = weights.length > 0 ? weights[0].weight : null;
+            const weightLoss = firstWeight && lastWeight ? (firstWeight - lastWeight).toFixed(1) : null;
+
+            const getDailyCalorieData = () => {
+                const data = {};
+                for (let i = 6; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    const dateStr = date.toISOString().split('T')[0];
+                    data[dateStr] = 0;
+                }
+
+                foods.forEach(food => {
+                    if (data[food.date] !== undefined) {
+                        data[food.date] += food.calories;
+                    }
+                });
+
+                return Object.entries(data).map(([date, calories]) => ({ date, calories }));
+            };
+
+            const Dashboard = () => (
+                <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-6">
+                        <h1 className="text-3xl font-bold mb-2">Vektkontroll</h1>
+                        <p className="text-blue-100">Overvåk din progresjon</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Kalorier i dag</h3>
+                            <div className="text-4xl font-bold text-blue-600 mb-2">{todaysCalories}</div>
+                            <p className="text-gray-600 mb-4">av {dailyCalorieGoal} kalorier</p>
+                            <div className="w-full bg-gray-200 rounded-full h-3">
+                                <div className="bg-green-500 h-3 rounded-full transition-all" style={{ width: `${caloriePercentage}%` }} />
+                            </div>
+                            <p className="text-sm text-gray-600 mt-2">
+                                {remainingCalories > 0 ? `${remainingCalories} igjen` : `${Math.abs(remainingCalories)} over`}
+                            </p>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Vektutviklingen</h3>
+                            {lastWeight ? (
+                                <>
+                                    <div className="text-4xl font-bold text-green-600 mb-2">{lastWeight} kg</div>
+                                    {weightLoss && <p className="text-green-600 font-semibold">↓ {weightLoss} kg</p>}
+                                </>
+                            ) : (
+                                <p className="text-gray-500">Logg vekten din</p>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Måltider i dag</h3>
+                            <div className="text-4xl font-bold text-purple-600 mb-2">{todaysFoods.length}</div>
+                            <p className="text-gray-600">registrert</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onClick={() => setShowFoodForm(true)} className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                            ➕ Mat/drikke
+                        </button>
+                        <button onClick={() => setShowWeightForm(true)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                            ➕ Vekt
+                        </button>
+                    </div>
+
+                    {weights.length > 0 && (
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-4">Vekttend</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={weights.slice(-30)}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                    <YAxis />
+                                    <Tooltip formatter={(value) => `${value} kg`} />
+                                    <Line type="monotone" dataKey="weight" stroke="#3b82f6" dot={{ fill: '#3b82f6', r: 4 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+
+                    {foods.length > 0 && (
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-4">Daglig kaloriersikt</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={getDailyCalorieData()}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                    <YAxis />
+                                    <Tooltip formatter={(value) => `${value} kalorier`} />
+                                    <Bar dataKey="calories" fill="#10b981" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
+            );
+
+            const FoodDiary = () => (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Dagbok</h2>
+                        <button onClick={() => setShowFoodForm(true)} className="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg">
+                            ➕ Legg til
+                        </button>
+                    </div>
+
+                    {favorites.length > 0 && (
+                        <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
+                            <h3 className="font-semibold text-gray-800 mb-4">❤️ Favoritter ({favorites.length})</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {favorites.map(fav => (
+                                    <button key={fav.id} onClick={() => useFavorite(fav)} className="bg-white hover:bg-yellow-100 border border-yellow-300 rounded p-3 text-left transition">
+                                        <p className="font-semibold text-gray-800 text-sm">{fav.description.substring(0, 40)}</p>
+                                        <p className="text-sm text-gray-600">{fav.calories} kcal</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="font-semibold text-gray-800 mb-4">I dag ({todaysFoods.length})</h3>
+                        {todaysFoods.length === 0 ? (
+                            <p className="text-gray-500">Ingen mat registrert</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {todaysFoods.map(food => (
+                                    <div key={food.id} className="flex justify-between items-center bg-gray-50 p-3 rounded">
+                                        <div>
+                                            <p className="font-semibold text-gray-800 text-sm">{food.name.substring(0, 35)}</p>
+                                            <p className="text-xs text-gray-600">{food.portion}g - {food.calories} kcal</p>
+                                        </div>
+                                        <button onClick={() => deleteFood(food.id)} className="text-red-500 hover:text-red-700">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+
+            const WeightLog = () => (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Vektlogg</h2>
+                        <button onClick={() => setShowWeightForm(true)} className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">
+                            ➕ Legg til
+                        </button>
+                    </div>
+
+                    {weights.length === 0 ? (
+                        <div className="bg-white rounded-lg shadow p-6 text-center">
+                            <p className="text-gray-500 mb-4">Ingen vekt registrert</p>
+                            <button onClick={() => setShowWeightForm(true)} className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">
+                                Logg vekt
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <div className="space-y-2">
+                                {weights.slice().reverse().map(w => (
+                                    <div key={w.id} className="flex justify-between items-center bg-gray-50 p-4 rounded">
+                                        <div>
+                                            <p className="font-semibold text-gray-800 text-lg">{w.weight} kg</p>
+                                            <p className="text-sm text-gray-600">{w.date}</p>
+                                        </div>
+                                        <button onClick={() => deleteWeight(w.id)} className="text-red-500 hover:text-red-700">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+
+            const SettingsPanel = () => (
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Innstillinger</h2>
+
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <label className="block text-gray-700 font-semibold mb-2">Daglig mål (kcal)</label>
+                        <input
+                            type="number"
+                            value={dailyCalorieGoal}
+                            onChange={(e) => {
+                                const newGoal = parseInt(e.target.value);
+                                setDailyCalorieGoal(newGoal);
+                                saveData(foods, weights, favorites);
+                            }}
+                            className="w-full border border-gray-300 rounded px-4 py-2 text-gray-800"
+                        />
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="font-semibold text-gray-800 mb-4">Statistikk</h3>
+                        <div className="space-y-2 text-sm">
+                            <p>Dagbokposter: <strong>{foods.length}</strong></p>
+                            <p>Vektregistreringer: <strong>{weights.length}</strong></p>
+                            <p>Favoritter: <strong>{favorites.length}</strong></p>
+                            {weightLoss && <p>Vektreduksjon: <strong>{weightLoss} kg</strong></p>}
+                        </div>
+                    </div>
+
+                    <button onClick={handleLogout} className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg">
+                        🚪 Logg ut
+                    </button>
+                </div>
+            );
+
+            if (!isLoggedIn) {
+                if (isFirstTime) {
+                    return (
+                        <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+                                <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">🏋️</h1>
+                                <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Vektkontroll</h2>
+
+                                <form onSubmit={handleSetupPassword} className="space-y-4">
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">Passord</label>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full border border-gray-300 rounded px-4 py-3 text-gray-800 focus:outline-none focus:border-blue-500"
+                                            placeholder="Minst 4 tegn"
+                                        />
+                                    </div>
+
+                                    {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+
+                                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                                        Opprett
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">🏋️</h1>
+                            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Vektkontroll</h2>
+
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div>
+                                    <label className="block text-gray-700 font-semibold mb-2">Passord</label>
+                                    <input
+                                        type="password"
+                                        value={loginPassword}
+                                        onChange={(e) => setLoginPassword(e.target.value)}
+                                        className="w-full border border-gray-300 rounded px-4 py-3 text-gray-800 focus:outline-none focus:border-blue-500"
+                                        placeholder="Skriv passord"
+                                    />
+                                </div>
+
+                                {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+
+                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                                    Logg inn
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <nav className="bg-white shadow-lg sticky top-0 z-50">
+                        <div className="max-w-6xl mx-auto px-4 py-4">
+                            <div className="flex justify-between items-center">
+                                <h1 className="text-xl font-bold text-blue-600">🏋️ Vektkontroll</h1>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-gray-100 rounded-lg transition text-lg">
+                                        ⚙️
+                                    </button>
+                                    <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg text-sm">
+                                        🚪
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="max-w-6xl mx-auto px-4 py-6">
+                        {showSettings ? (
+                            <SettingsPanel />
+                        ) : (
+                            <>
+                                <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
+                                    <button onClick={() => setActiveTab('dashboard')} className={`py-3 px-3 font-semibold border-b-2 transition whitespace-nowrap ${activeTab === 'dashboard' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'}`}>
+                                        📊
+                                    </button>
+                                    <button onClick={() => setActiveTab('diary')} className={`py-3 px-3 font-semibold border-b-2 transition whitespace-nowrap ${activeTab === 'diary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'}`}>
+                                        📖
+                                    </button>
+                                    <button onClick={() => setActiveTab('weights')} className={`py-3 px-3 font-semibold border-b-2 transition whitespace-nowrap ${activeTab === 'weights' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600'}`}>
+                                        ⚖️
+                                    </button>
+                                </div>
+
+                                {activeTab === 'dashboard' && <Dashboard />}
+                                {activeTab === 'diary' && <FoodDiary />}
+                                {activeTab === 'weights' && <WeightLog />}
+
+                                {showFoodForm && (
+                                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Søk mat/drikke</h2>
+
+                                            <div className="space-y-4">
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        onKeyPress={(e) => e.key === 'Enter' && searchFood()}
+                                                        placeholder="F.eks. egg, laks..."
+                                                        className="flex-1 border border-gray-300 rounded px-4 py-2"
+                                                    />
+                                                    <button onClick={searchFood} disabled={searchLoading} className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg">
+                                                        {searchLoading ? '⏳' : '🔍'}
+                                                    </button>
+                                                </div>
+
+                                                {searchResults.length > 0 && (
+                                                    <div className="border border-gray-200 rounded p-4 space-y-2 max-h-48 overflow-y-auto">
+                                                        <p className="font-semibold">Resultater ({searchResults.length})</p>
+                                                        {searchResults.map(food => (
+                                                            <button key={food.id} onClick={() => setSelectedFood(food)} className={`w-full text-left p-3 rounded border-2 transition ${selectedFood?.id === food.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                                                                <p className="font-semibold text-sm">{food.description}</p>
+                                                                <p className="text-xs text-gray-600">{food.calories.toFixed(1)} kcal/100g</p>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {selectedFood && (
+                                                    <div>
+                                                        <label className="block text-gray-700 font-semibold mb-2">Porsjonstørrelse: {foodPortionSize}g</label>
+                                                        <input type="range" min="10" max="500" value={foodPortionSize} onChange={(e) => setFoodPortionSize(parseInt(e.target.value))} className="w-full" />
+                                                        <p className="text-gray-600 mt-2">Totalt: {Math.round((selectedFood.calories / 100) * foodPortionSize)} kcal</p>
+                                                    </div>
+                                                )}
+
+                                                {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {selectedFood && (
+                                                        <>
+                                                            <button onClick={() => addToFavorites(selectedFood)} className="flex-1 min-w-32 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm">
+                                                                ❤️ Favoritt
+                                                            </button>
+                                                            <button onClick={addFood} className="flex-1 min-w-32 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg text-sm">
+                                                                Legg til
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    <button onClick={() => { setShowFoodForm(false); setSelectedFood(null); setSearchQuery(''); setSearchResults([]); }} className="flex-1 min-w-32 bg-gray-400 hover:bg-gray-500 text-white py-2 px-4 rounded-lg text-sm">
+                                                        Lukk
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {showWeightForm && (
+                                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                                        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Logg vekt</h2>
+
+                                            <form onSubmit={addWeight} className="space-y-4">
+                                                <div>
+                                                    <label className="block text-gray-700 font-semibold mb-2">Vekt (kg)</label>
+                                                    <input type="number" step="0.1" value={weightValue} onChange={(e) => setWeightValue(e.target.value)} className="w-full border border-gray-300 rounded px-4 py-2" placeholder="F.eks. 75.5" autoFocus />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-gray-700 font-semibold mb-2">Dato</label>
+                                                    <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className="w-full border border-gray-300 rounded px-4 py-2" />
+                                                </div>
+
+                                                {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+
+                                                <div className="flex gap-2">
+                                                    <button type="submit" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+                                                        Lagre
+                                                    </button>
+                                                    <button type="button" onClick={() => { setShowWeightForm(false); setWeightValue(''); }} className="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">
+                                                        Avbryt
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<VektKontrollApp />);
+    </script>
+</body>
+</html>

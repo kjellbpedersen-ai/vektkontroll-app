@@ -1,0 +1,65 @@
+{
+  "name": "Vektkontroll - Profesjonell Vektapp",
+  "short_name": "Vektkontroll",
+  "description": "Profesjonell vektkontrrollapp med mat-registrering, kaloriberegning og vektkontroll",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%233b82f6' width='192' height='192'/><text x='50%' y='50%' font-size='100' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>💪</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%233b82f6' width='512' height='512'/><text x='50%' y='50%' font-size='300' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>💪</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180' rx='40'/><text x='50%' y='50%' font-size='90' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>💪</text></svg>",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%23f3f4f6' width='540' height='720'/><rect fill='%233b82f6' width='540' height='100'/><text x='270' y='50' font-size='40' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'>Vektkontroll</text><rect x='20' y='130' width='500' height='120' rx='10' fill='white' stroke='%23e5e7eb' stroke-width='2'/><text x='50' y='160' font-size='20' fill='%23374151'>Kalorier i dag</text><text x='50' y='200' font-size='35' font-weight='bold' fill='%232563eb'>450/2000</text><rect x='20' y='270' width='500' height='100' rx='10' fill='white' stroke='%23e5e7eb' stroke-width='2'/><text x='50' y='300' font-size='20' fill='%23374151'>Vektutviklingen</text><text x='50' y='340' font-size='30' font-weight='bold' fill='%2316a34a'>75.0 kg</text></svg>",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    }
+  ],
+  "categories": ["health", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Legg til mat",
+      "short_name": "Mat",
+      "description": "Legg til mat eller drikke raskt",
+      "url": "/index.html?action=add-food",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%2310b981' width='96' height='96' rx='20'/><text x='48' y='48' font-size='60' text-anchor='middle' dominant-baseline='middle'>🍎</text></svg>",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Logg vekt",
+      "short_name": "Vekt",
+      "description": "Logg vekten din raskt",
+      "url": "/index.html?action=add-weight",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%232563eb' width='96' height='96' rx='20'/><text x='48' y='48' font-size='60' text-anchor='middle' dominant-baseline='middle'>⚖️</text></svg>",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
